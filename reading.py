@@ -1,4 +1,4 @@
 """
-Defines the DataStore and all interfaces needed for a Reading in the OCR platform
+Defines the datastore and all interfaces needed for a Reading in the OCR platform
 """
 __author__ = 'Cesar'
