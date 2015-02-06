@@ -32,67 +32,45 @@ class User(ndb.Model):
         Returns:
             True if email exist False otherwise
         """
-        return User.query(User.email == email).count(1) == 1
+        return cls.query(cls.email == email).count(1) == 1
 
     @classmethod
-    def get_data(cls, email):
-        """
-        Gets user data form the datastore.
-
-        Args:
-            email: (String) email from request
-
-        Returns:
-            user data as dict
-        """
-        return User.query(User.email == email).fetch(1)
-
-    def __init__(self, email, name='', age=0, account_type='', **kwds):
-        """
-        Creates new user
-        """
-        super(User, self).__init__(**kwds)
-
-        self.email = email
-        self.name = name
-        self.age = age
-        self.account_type = account_type
-
-    def create_in_datastore(self):
+    def create_in_datastore(cls, account_type, age, email, name):
         """
         Creates a new user in datastore
         """
         try:
-            if self.exists(self.email):
+            if User.exists(email):
                 raise UserCreationError('User email already in platform')
             else:
-                u = self.__init__(email=self.email,
-                                  name=self.name,
-                                  age=self.age,
-                                  account_type=self.account_type)
+                u = User(account_type=account_type, age=age, email=email, name=name)
                 key = u.put()
         except Exception as e:
-            raise UserCreationError('Error creating the user in platform: '+e.message)
+            raise UserCreationError('Error creating the user in platform: '+e.__str__())
         else:
             logging.debug('[User] - New User Key = {0}'.format(key))
             return True
 
-    def get(self):
+    @classmethod
+    def get_from_datastore(cls, email):
         """
         Gets user from datastore based on email
         """
-        if self.exists(self.email):
-            logging.debug("[User] - Key = {0}".format(u[0].key))
-            u = self.get_data(self.email)
-            logging.debug("[User] - email = {0}".format(u[0].email))
-            self.name = u[0].name
-            logging.debug("[User] - name = {0}".format(u[0].name))
-            self.age = u[0].age
-            logging.debug("[User] - age = {0}".format(u[0].age))
-            self.account_type = u[0].account_type
-            logging.debug("[User] - account_type = {0}".format(u[0].account_type))
+        try:
+            if User.exists(email):
+                query = User.query(User.email == 'c@a').fetch(limit=1)
+                u = query
+            else:
+                raise GetUserError('User does not exist')
+        except Exception as e:
+                raise GetUserError('Error getting user: '+e.__str__())
         else:
-            raise GetUserError('User does not exist')
+            logging.debug("[User] - Key = {0}".format(u[0].key))
+            logging.debug("[User] - email = {0}".format(u[0].email))
+            logging.debug("[User] - name = {0}".format(u[0].name))
+            logging.debug("[User] - age = {0}".format(u[0].age))
+            logging.debug("[User] - account_type = {0}".format(u[0].account_type))
+            return u[0]
 
 
 class UserCreationError(Exception):
