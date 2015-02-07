@@ -2,3 +2,195 @@
 Defines the datastore and all interfaces needed for a Meter in the OCR platform
 """
 __author__ = 'Cesar'
+
+import logging
+from google.appengine.ext import ndb
+from user import User, GetUserError
+
+
+class Meter(ndb.Model):
+    """
+    Represents a meter in the platform. A user may be several meters assigned.
+
+        - user: The user that has this meter assigned.
+        - account_number: Key that ties to JMAS system.
+        - balance: Authentication used to validate the User.
+        - model: Model of the physical meter, for OCR purposes.
+    """
+
+    user = ndb.KeyProperty(kind=User)
+    account_number = ndb.StringProperty()
+    balance = ndb.IntegerProperty()
+    model = ndb.StringProperty(choices=['AV3-STAR', 'Dorot', 'Cicasa', 'IUSA'])
+
+    @classmethod
+    def exists(cls, account_number):
+        """
+        Checks the datastore to find if the meter (account_number) is already on it.
+
+        Args:
+            account_number: (String) account_number from request
+
+        Returns:
+            True if account exist False otherwise
+        """
+        return cls.query(cls.account_number == account_number).count(1) == 1
+
+    @classmethod
+    def create_in_datastore(cls, account_number, balance, model):
+        """
+        Creates a new meter in datastore
+        """
+        try:
+            if Meter.exists(account_number):
+                raise MeterCreationError('Meter account number already in platform')
+            else:
+                m = Meter(account_number=account_number, balance=balance, model=model)
+                key = m.put()
+        except Exception as e:
+            raise MeterCreationError('Error creating the meter in platform: '+e.__str__())
+        else:
+            logging.debug('[Meter] - New Meter Key = {0}'.format(key))
+            return True
+
+    @classmethod
+    def get_from_datastore(cls, account_number):
+        """
+        Gets meter from datastore based on account number
+        """
+        try:
+            if Meter.exists(account_number):
+                m = Meter.query(Meter.account_number == account_number).fetch(limit=1)
+            else:
+                raise GetMeterError('Meter does not exist')
+        except Exception as e:
+                raise GetMeterError('Error getting meter: '+e.__str__())
+        else:
+            logging.debug("[Meter] - Key = {0}".format(m[0].key))
+            logging.debug("[Meter] - User Key = {0}".format(m[0].user))
+            logging.debug("[Meter] - Account Number = {0}".format(m[0].account_number))
+            logging.debug("[Meter] - Balance = {0}".format(m[0].balance))
+            logging.debug("[Meter] - Model = {0}".format(m[0].model))
+            return m[0]
+
+    @classmethod
+    def assign_to_user(cls, email, account_number):
+        """
+        Assigns a meter to a user (email) in the platform.
+
+        Args:
+            email: (String) email from user that will be assigned the meter
+            account_number: (String) account number of the meter to assign
+
+        Returns:
+            True if assignment successful, False otherwise
+        """
+        try:
+            u = User.get_from_datastore(email)
+            m = Meter.get_from_datastore(account_number)
+
+            meter = m.key.get()
+            meter.user = u.key
+            meter.put()
+        except GetUserError:
+            raise
+        except GetMeterError:
+            raise
+        else:
+            logging.debug("[Meter] - assign_to_user(): Assignment successful! meter = {0} assigned to user = {1}"
+                          .format(meter.account_number, u.email))
+            return True
+
+    @classmethod
+    def set_balance(cls, account_number, new_balance):
+        """
+        Sets a new balance
+
+        Args:
+            account_number: (String) account number of the meter
+            new_balance: (Int) New balance to set
+
+        Returns:
+            True if assignment successful, False otherwise
+        """
+        try:
+            m = Meter.get_from_datastore(account_number)
+
+            meter = m.key.get()
+            meter.balance = new_balance
+            meter.put()
+        except Exception:
+            return False
+        else:
+            return True
+
+    @classmethod
+    def get_balance(cls, account_number):
+        """
+        Gets a meter current balance
+
+        Args:
+            account_number: (String) account number of the meter
+
+        Returns:
+            (Int) balance
+        """
+        m = Meter.get_from_datastore(account_number)
+
+        return m.balance
+
+    @classmethod
+    def set_model(cls, account_number, new_model):
+        """
+        Assigns a new value to the model of a meter
+
+        Args:
+            account_number: (String) account number of the meter
+            new_model: (String) New model to set. Refer to the accepted values on ndb Properties
+
+        Returns:
+            True if assignment successful, False otherwise
+        """
+        m = Meter.get_from_datastore(account_number)
+
+        try:
+            meter = m.key.get()
+            meter.model = new_model
+            meter.put()
+        except Exception:
+            return False
+        else:
+            return True
+
+    @classmethod
+    def get_model(cls, account_number):
+        """
+        Gets a meter current model
+
+        Args:
+            account_number: (String) account number of the meter
+
+        Returns:
+            (String) model
+        """
+        m = Meter.get_from_datastore(account_number)
+
+        return m.model
+
+
+
+class MeterCreationError(Exception):
+    def __init__(self, value):
+        self.value = value
+        logging.exception('[User] - '+value, exc_info=True)
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class GetMeterError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)

@@ -58,7 +58,7 @@ class User(ndb.Model):
         """
         try:
             if User.exists(email):
-                query = User.query(User.email == 'c@a').fetch(limit=1)
+                query = User.query(User.email == email).fetch(limit=1)
                 u = query
             else:
                 raise GetUserError('User does not exist')
