@@ -17,7 +17,7 @@ class Meter(ndb.Model):
         - balance: Authentication used to validate the User.
         - model: Model of the physical meter, for OCR purposes.
     """
-
+    # TODO: add geolocation property
     user = ndb.KeyProperty(kind=User)
     account_number = ndb.StringProperty()
     balance = ndb.IntegerProperty()
@@ -45,6 +45,7 @@ class Meter(ndb.Model):
             if Meter.exists(account_number):
                 raise MeterCreationError('Meter account number already in platform')
             else:
+                # TODO: get current balance from JMAS api
                 m = Meter(account_number=account_number, balance=balance, model=model)
                 key = m.put()
         except Exception as e:
@@ -52,6 +53,32 @@ class Meter(ndb.Model):
         else:
             logging.debug('[Meter] - New Meter Key = {0}'.format(key))
             return True
+
+    @classmethod
+    def get_all_from_datastore(cls, user):
+        """
+        Gets all meters from datastore assigned to a user
+        Args:
+            user: (String) email
+        Returns:
+            A List with all the meters assigned to a user
+        """
+        try:
+            u = User.get_from_datastore(user)
+            query_response = Meter.query(Meter.user == u.key).fetch()
+            if query_response:
+                resp = []
+                for b in query_response:
+                    resp.append(b)
+            else:
+                raise GetMeterError('No Meters found under specified criteria: User: {0}'
+                                    .format(user))
+        except Exception as e:
+                raise GetMeterError('Error getting Meter: '+e.__str__())
+        else:
+            for r in resp:
+                logging.debug("[Meter] = {0}".format(r))
+            return resp
 
     @classmethod
     def get_from_datastore(cls, account_number):
@@ -120,6 +147,7 @@ class Meter(ndb.Model):
             meter.balance = new_balance
             meter.put()
         except Exception:
+            # FIXME rise exception for error handling
             return False
         else:
             return True
@@ -158,6 +186,7 @@ class Meter(ndb.Model):
             meter.model = new_model
             meter.put()
         except Exception:
+            # FIXME rise exception for error handling
             return False
         else:
             return True
@@ -178,11 +207,10 @@ class Meter(ndb.Model):
         return m.model
 
 
-
 class MeterCreationError(Exception):
     def __init__(self, value):
         self.value = value
-        logging.exception('[User] - '+value, exc_info=True)
+        logging.exception('[Meter] - '+value, exc_info=True)
 
     def __str__(self):
         return repr(self.value)

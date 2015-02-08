@@ -1,16 +1,18 @@
 """
 Defines all methods needed for the API. Implemented using Google Cloud Endpoints.
 """
+
 __author__ = 'Cesar'
 
 import endpoints
+from google.appengine.ext import ndb
 from protorpc import remote
 import logging
 import messages
 from user import User, UserCreationError, GetUserError
 from meter import Meter, MeterCreationError, GetMeterError
 from reading import Reading, ReadingCreationError
-
+from bill import Bill, BillCreationError, GetBillError, BillPaymentError
 package = 'OCR'
 
 
@@ -160,6 +162,33 @@ class OCRBackendApi(remote.Service):
             resp.error = e.message
         return resp
 
+    @endpoints.method(messages.GetMeters,
+                      messages.GetMetersResponse,
+                      http_method='POST',
+                      name='meter.get_all_assigned_to_user',
+                      path='meter/get_all_assigned_to_user')
+    def get_meters(self, request):
+        """
+        Gets all meters assigned to a user
+        """
+        logging.debug("[FrontEnd - get_meters()] - User = {0}".format(request.user))
+        resp = messages.GetMetersResponse()
+        try:
+            meters = Meter.get_all_from_datastore(request.user)
+        except GetMeterError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            for m in meters:
+                r = messages.Meter()
+                r.urlsafe_key = m.key.urlsafe()
+                r.account_number = m.account_number
+                r.balance = m.balance
+                r.model = m.model
+                resp.meters.append(r)
+            resp.ok = True
+        return resp
+
     """
     READING
     """
@@ -184,5 +213,84 @@ class OCRBackendApi(remote.Service):
             resp.ok = True
         return resp
 
+    """
+    BILL
+    """
+    @endpoints.method(messages.NewBill,
+                      messages.NewBillResponse,
+                      http_method='POST',
+                      name='bill.new',
+                      path='bill/new')
+    def new_bill(self, request):
+        """
+        Generates a new bill in the platform
+        """
+        logging.debug("[FrontEnd - new_bill()] - Account Number = {0}".format(request.account_number))
+        resp = messages.NewBillResponse()
+        try:
+            Bill.save_to_datastore(request.account_number)
+        except BillCreationError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            resp.ok = True
+        return resp
+
+    @endpoints.method(messages.GetBills,
+                      messages.GetBillsResponse,
+                      http_method='POST',
+                      name='bill.get',
+                      path='bill/get')
+    def get_bills(self, request):
+        """
+        Gets all bills that match the criteria.
+        """
+        logging.debug("[FrontEnd - get_bills()] - Account Number = {0}".format(request.account_number))
+        logging.debug("[FrontEnd - get_bills()] - Status = {0}".format(request.status))
+        resp = messages.GetBillsResponse()
+        try:
+            bills = Bill.get_all_from_datastore(request.account_number, request.status)
+        except GetBillError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            for b in bills:
+                r = messages.Bill()
+                r.urlsafe_key = b.key.urlsafe()
+                r.creation_date = b.created
+                r.account_number = b.meter.get().account_number
+                r.balance = b.balance
+                r.amount = b.amount
+                r.status = b.status
+                resp.bills.append(r)
+            resp.ok = True
+        return resp
+
+    @endpoints.method(messages.PayBill,
+                      messages.PayBillResponse,
+                      http_method='POST',
+                      name='bill.pay',
+                      path='bill/pay')
+    def pay_bill(self, request):
+        """
+        Marks a bill as payed in the platform
+        """
+        logging.debug("[FrontEnd - pay_bill()] - Bill Key = {0}".format(request.bill_key))
+        resp = messages.PayBillResponse()
+        try:
+            bill_key = ndb.Key(urlsafe=request.bill_key)
+            Bill.pay(bill_key)
+        except GetBillError as e:
+            resp.ok = False
+            resp.error = e.value
+        except GetMeterError as e:
+            resp.ok = False
+            resp.error = e.value
+        except BillPaymentError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            resp.ok = True
+        return resp
 
 app = endpoints.api_server([OCRBackendApi])

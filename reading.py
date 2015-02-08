@@ -43,6 +43,7 @@ class Reading(ndb.Model):
             # Update balance in datastore
             current_balance = Meter.get_balance(meter)
             new_balance = current_balance + measure
+            # FIXME handle exception from Meter class
             Meter.set_balance(meter, new_balance)
             logging.debug('[Reading] - New Balance: {0} = (Old Balance = {1}) + (Reading = {2})'
                           .format(new_balance, current_balance, measure))
@@ -52,7 +53,7 @@ class Reading(ndb.Model):
 class ReadingCreationError(Exception):
     def __init__(self, value):
         self.value = value
-        logging.exception('[User] - '+value, exc_info=True)
+        logging.exception('[Reading] - '+value, exc_info=True)
 
     def __str__(self):
         return repr(self.value)
