@@ -13,6 +13,7 @@ from user import User, UserCreationError, GetUserError
 from meter import Meter, MeterCreationError, GetMeterError
 from reading import Reading, ReadingCreationError
 from bill import Bill, BillCreationError, GetBillError, BillPaymentError
+from prepay import Prepay, PrepayCreationError, GetPrepayError, PrepayPaymentError
 package = 'OCR'
 
 
@@ -287,6 +288,86 @@ class OCRBackendApi(remote.Service):
             resp.ok = False
             resp.error = e.value
         except BillPaymentError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            resp.ok = True
+        return resp
+
+    """
+    PREPAY
+    """
+    @endpoints.method(messages.NewPrepay,
+                      messages.NewPrepayResponse,
+                      http_method='POST',
+                      name='prepay.new',
+                      path='prepay/new')
+    def new_prepay(self, request):
+        """
+        Generates a new prepay event in the platform
+        """
+        logging.debug("[FrontEnd - new_prepay()] - Account Number = {0}".format(request.account_number))
+        resp = messages.NewPrepayResponse()
+        try:
+            Prepay.save_to_datastore(request.account_number, request.m3_to_prepay)
+        except PrepayCreationError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            resp.ok = True
+        return resp
+
+    @endpoints.method(messages.GetPrepays,
+                      messages.GetPrepaysResponse,
+                      http_method='POST',
+                      name='prepay.get',
+                      path='prepay/get')
+    def get_prepays(self, request):
+        """
+        Gets all prepays events
+        """
+        logging.debug("[FrontEnd - get_prepays()] - Account Number = {0}".format(request.account_number))
+        logging.debug("[FrontEnd - get_prepays()] - Status = {0}".format(request.status))
+        resp = messages.GetPrepaysResponse()
+        try:
+            prepays = Prepay.get_all_from_datastore(request.account_number, request.status)
+        except GetPrepayError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            for p in prepays:
+                r = messages.Prepay()
+                r.urlsafe_key = p.key.urlsafe()
+                r.creation_date = p.created
+                r.account_number = p.meter.get().account_number
+                r.balance = p.balance
+                r.prepay = p.prepay
+                r.amount = p.amount
+                resp.prepays.append(r)
+            resp.ok = True
+        return resp
+
+    @endpoints.method(messages.PayPrepay,
+                      messages.PayPrepayResponse,
+                      http_method='POST',
+                      name='prepay.pay',
+                      path='prepay/pay')
+    def pay_prepay(self, request):
+        """
+        Marks a prepay event as payed in the platform
+        """
+        logging.debug("[FrontEnd - pay_prepay()] - Prepay Key = {0}".format(request.prepay_key))
+        resp = messages.PayPrepayResponse()
+        try:
+            prepay_key = ndb.Key(urlsafe=request.prepay_key)
+            Prepay.pay(prepay_key)
+        except GetPrepayError as e:
+            resp.ok = False
+            resp.error = e.value
+        except GetMeterError as e:
+            resp.ok = False
+            resp.error = e.value
+        except PrepayPaymentError as e:
             resp.ok = False
             resp.error = e.value
         else:

@@ -17,7 +17,7 @@ def get_conversion_factor():
 
 class Bill(ndb.Model):
     """
-    Represents a Bill in for a Meter the platform.
+    Represents a Bill for a Meter in the platform.
 
         - meter: The meter associated with this reading
         - balance: Balance of the meter at the time of the bill (m3)
@@ -28,7 +28,7 @@ class Bill(ndb.Model):
     created = ndb.DateTimeProperty(auto_now_add=True)
     meter = ndb.KeyProperty(kind=Meter)
     balance = ndb.IntegerProperty()
-    amount = ndb.IntegerProperty()
+    amount = ndb.FloatProperty()
     status = ndb.StringProperty(choices=['Paid', 'Unpaid'])
 
     @classmethod
@@ -52,7 +52,7 @@ class Bill(ndb.Model):
                 raise GetBillError('No Bills found under specified criteria: Account Number: {0}, Status:{1}'
                                    .format(account_number, status))
         except Exception as e:
-                raise GetBillError('Error getting user: '+e.__str__())
+                raise GetBillError('Error getting Bill: '+e.__str__())
         else:
             for r in resp:
                 logging.debug("[Bill] = {0}".format(r))
@@ -92,7 +92,7 @@ class Bill(ndb.Model):
             new_balance = current_balance - b.balance
             # FIXME handle exception from Meter class
             Meter.set_balance(m.account_number, new_balance)
-            logging.debug('[Bill] - New Balance: {0} = (Old Balance = {1}) + (Paid Balance = {2})'
+            logging.debug('[Bill] - New Balance: {0} = (Old Balance = {1}) - (Billed Balance = {2})'
                           .format(new_balance, current_balance, b.balance))
             return True
 

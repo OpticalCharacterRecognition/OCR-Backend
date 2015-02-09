@@ -215,7 +215,7 @@ class Bill(messages.Message):
     creation_date = message_types.DateTimeField(2)
     account_number = messages.StringField(3)
     balance = messages.IntegerField(4)
-    amount = messages.IntegerField(5)
+    amount = messages.FloatField(5)
     status = messages.StringField(6)
 
 
@@ -269,7 +269,92 @@ class PayBill(messages.Message):
 
 class PayBillResponse(messages.Message):
     """
-    Response to Bill creation request
+    Response to Bill payment request
+        ok: (Boolean) Reading creation successful or failed
+        error: (String) If creation failed, contains the reason, otherwise empty.
+    """
+    ok = messages.BooleanField(1)
+    error = messages.StringField(2)
+
+"""
+PREPAY
+"""
+
+
+class Prepay(messages.Message):
+    """
+    Message containing the details of Prepay event
+        urlsafe_key: (String) unique id
+        creation_date: (String)
+        account_number: (String)
+        balance: (Integer) m3 at the creation of the bill
+        prepay: (Integer) amount of m3 to be prepaid
+        amount: (Integer) payment due based on the factor from JMAS
+
+    """
+    urlsafe_key = messages.StringField(1)
+    creation_date = message_types.DateTimeField(2)
+    account_number = messages.StringField(3)
+    balance = messages.IntegerField(4)
+    prepay = messages.IntegerField(5)
+    amount = messages.FloatField(6)
+
+
+class NewPrepay(messages.Message):
+    """
+    Message containing the information to create a Prepay event
+        account_number: (String)
+        m3_to_prepay: (Integer) amount in m3 to prepay
+    """
+    account_number = messages.StringField(1, required=True)
+    m3_to_prepay = messages.IntegerField(2, required=True)
+
+
+class NewPrepayResponse(messages.Message):
+    """
+    Response to Prepay event creation request
+        ok: (Boolean) Reading creation successful or failed
+        amount_to_pay: (Integer) Amount in currency to pay for the solicited m3_to_prepay (see class NewPrepay on
+        messages.py)
+        error: (String) If creation failed, contains the reason, otherwise empty.
+    """
+    ok = messages.BooleanField(1)
+    amount_to_pay = messages.IntegerField(2)
+    error = messages.StringField(3)
+
+
+class GetPrepays(messages.Message):
+    """
+    Message asking for Prepay events for an account
+        account_number: (String)
+    """
+    account_number = messages.StringField(1, required=True)
+    status = messages.StringField(2, required=True)
+
+
+class GetPrepaysResponse(messages.Message):
+    """
+    Response to a location search
+        ok: (Boolean) Bill search successful or failed
+        prepays: (String) If search successful contains a list of prepay events (see class Prepay on messages.py)
+        error: (String) If search failed, contains the reason, otherwise empty.
+    """
+    ok = messages.BooleanField(1)
+    prepays = messages.MessageField(Prepay, 2, repeated=True)
+    error = messages.StringField(3)
+
+
+class PayPrepay(messages.Message):
+    """
+    Message requesting to mark a Prepay event as payed
+        prepay_key: (String)
+    """
+    prepay_key = messages.StringField(1, required=True)
+
+
+class PayPrepayResponse(messages.Message):
+    """
+    Response to Prepay payment request
         ok: (Boolean) Reading creation successful or failed
         error: (String) If creation failed, contains the reason, otherwise empty.
     """
