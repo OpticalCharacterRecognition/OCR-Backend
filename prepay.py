@@ -45,7 +45,8 @@ class Prepay(ndb.Model):
         """
         try:
             meter = Meter.get_from_datastore(account_number)
-            query_response = Prepay.query(Prepay.meter == meter.key and Prepay.status == status).fetch()
+            query_response = Prepay.query(ndb.AND(Prepay.meter == meter.key,
+                                                  Prepay.status == status)).fetch()
             if query_response:
                 resp = []
                 for p in query_response:

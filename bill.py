@@ -43,7 +43,8 @@ class Bill(ndb.Model):
         """
         try:
             meter = Meter.get_from_datastore(account_number)
-            query_response = Bill.query(Bill.meter == meter.key and Bill.status == status).fetch()
+            query_response = Bill.query(ndb.AND(Bill.meter == meter.key,
+                                                Bill.status == status)).fetch()
             if query_response:
                 resp = []
                 for b in query_response:
