@@ -49,6 +49,21 @@ class Reading(ndb.Model):
                           .format(new_balance, current_balance, measure))
             return True
 
+    @classmethod
+    def set_image_processing_task(cls, meter, image_name):
+        """
+        Saves a Reading as a new entity on the datastore.
+        Args:
+            account_number: (String) account_number from request
+            image_name: (String) name of the image in CloudStorage
+        Returns:
+            True if creation successful, exception otherwise
+
+        """
+        logging.debug('[Reading] - Set Image Processing Task: Image Name = {0}'.format(image_name))
+        # TODO : Implement the new task in the pull queue
+        return True
+
 
 class ReadingCreationError(Exception):
     def __init__(self, value):

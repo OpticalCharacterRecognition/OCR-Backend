@@ -182,7 +182,7 @@ class NewReading(messages.Message):
         measure: (Integer)
     """
     account_number = messages.StringField(1, required=True)
-    measure = messages.IntegerField(2, required=True)
+    image_name = messages.StringField(2, required=True)
 
 
 class NewReadingResponse(messages.Message):

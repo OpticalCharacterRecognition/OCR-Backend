@@ -196,17 +196,17 @@ class OCRBackendApi(remote.Service):
     @endpoints.method(messages.NewReading,
                       messages.NewReadingResponse,
                       http_method='POST',
-                      name='reading.new',
-                      path='reading/new')
+                      name='reading.new_image',
+                      path='reading/new_image')
     def new_reading(self, request):
         """
         Generates a new reading in the platform
         """
         logging.debug("[FrontEnd - new_reading()] - Account Number = {0}".format(request.account_number))
-        logging.debug("[FrontEnd - new_reading()] - Reading = {0}".format(request.measure))
+        logging.debug("[FrontEnd - new_reading()] - Reading = {0}".format(request.image_name))
         resp = messages.NewReadingResponse()
         try:
-            Reading.save_to_datastore(request.account_number, request.measure)
+            Reading.set_image_processing_task(request.account_number, request.image_name)
         except ReadingCreationError as e:
             resp.ok = False
             resp.error = e.value
