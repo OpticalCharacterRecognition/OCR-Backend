@@ -6,13 +6,8 @@ __author__ = 'Cesar'
 import logging
 from google.appengine.ext import ndb
 from meter import Meter, GetMeterError
-
-
-def get_conversion_factor():
-    """
-    Temp function until we get the API from JMAS
-    """
-    return 1
+import jmas_api
+from datetime import datetime
 
 
 class Bill(ndb.Model):
@@ -25,7 +20,7 @@ class Bill(ndb.Model):
         - status: Paid or unpaid
     """
 
-    created = ndb.DateTimeProperty(auto_now_add=True)
+    date = ndb.DateTimeProperty()
     meter = ndb.KeyProperty(kind=Meter)
     balance = ndb.IntegerProperty()
     amount = ndb.FloatProperty()
@@ -66,19 +61,23 @@ class Bill(ndb.Model):
         to generate the amount based on the conversion factor (from JMAS) and updates the balance
         of the associated Meter. Once a bill is created the m3 billed are removed from the meter balance
         and stored in the bill with a status of 'Paid' or 'Unpaid'
-        Args:
-            account_number: (String) account_number from request
+        :param
+            meter: (String) account_number from request
 
-        Returns:
+        :return
             True if creation successful, exception otherwise
 
         """
         try:
             m = Meter.get_from_datastore(meter)
             if m.balance > 0:
-                factor = get_conversion_factor()
+                factor = jmas_api.get_conversion_factor()
                 calculated_amount = m.balance*factor
-                b = Bill(meter=m.key, balance=m.balance, amount=calculated_amount, status='Unpaid')
+                b = Bill(date=datetime.now(),
+                         meter=m.key,
+                         balance=m.balance,
+                         amount=calculated_amount,
+                         status='Unpaid')
                 key = b.put()
             else:
                 raise BillCreationError('Nothing to Bill! Current Balance: {0} <= 0 '.format(m.balance))
@@ -95,6 +94,33 @@ class Bill(ndb.Model):
             Meter.set_balance(m.account_number, new_balance)
             logging.debug('[Bill] - New Balance: {0} = (Old Balance = {1}) - (Billed Balance = {2})'
                           .format(new_balance, current_balance, b.balance))
+            return True
+
+    @classmethod
+    def save_history_to_datastore(cls, meter_key, bills):
+        """
+        Saves historic Bills as a new entities on the datastore.
+        :param
+            account_number: (String) account_number
+            bills: (Dictionary) from jmas_api
+
+        :return
+            True if creation successful, exception otherwise
+
+        """
+        try:
+            for bill in bills:
+                b = Bill(date=bill,
+                         meter=meter_key,
+                         balance=bills[bill]/jmas_api.get_conversion_factor(),
+                         amount=bills[bill],
+                         status='Paid')
+                key = b.put()
+        except Exception as e:
+            logging.exception("[Bill] - "+e.message)
+            raise BillCreationError('Error creating bill in datastore: '+e.__str__())
+        else:
+            logging.debug('[Bill] - Historical Bills successfully stored')
             return True
 
     @classmethod

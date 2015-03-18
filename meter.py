@@ -6,6 +6,7 @@ __author__ = 'Cesar'
 import logging
 from google.appengine.ext import ndb
 from user import User, GetUserError
+import jmas_api
 
 
 class Meter(ndb.Model):
@@ -37,22 +38,55 @@ class Meter(ndb.Model):
         return cls.query(cls.account_number == account_number).count(1) == 1
 
     @classmethod
-    def create_in_datastore(cls, account_number, balance, model):
+    def create_in_datastore(cls, account_number):
         """
-        Creates a new meter in datastore
+        Creates a new meter in datastore. Checks if the account number is already in the platform
+        if not, calls the transactional create of the datastore objects.
         """
         try:
             if Meter.exists(account_number):
                 raise MeterCreationError('Meter account number already in platform')
             else:
-                # TODO: get current balance from JMAS api
-                m = Meter(account_number=account_number, balance=balance, model=model)
-                key = m.put()
+                Meter.transactional_create(account_number)
         except Exception as e:
             raise MeterCreationError('Error creating the meter in platform: '+e.__str__())
         else:
-            logging.debug('[Meter] - New Meter Key = {0}'.format(key))
             return True
+
+    @classmethod
+    @ndb.transactional(xg=True)
+    def transactional_create(cls, account_number):
+        """
+        Transactional to the datastore. A transaction is an operation
+        or set of operations that either succeeds completely or fails completely.
+
+            :param account_number: meter number to create
+            :exception if transaction fails
+        """
+        # Import in the function to avoid circular import
+        from reading import Reading
+        from bill import Bill
+
+        try:
+            balance = jmas_api.get_balance(account_number)
+            model = jmas_api.get_model(account_number)
+            # Create Meter
+            m = Meter(account_number=account_number, balance=balance, model=model)
+            meter_key = m.put()
+            # Get and save historic bills
+            bills = jmas_api.get_bills(account_number)
+            # from bill import Bill
+            Bill.save_history_to_datastore(meter_key, bills)
+            # Get and save historic readings
+            # TODO: TEMP -> historic readings are based on historic bills
+            measurements = dict()
+            for date in bills.keys():
+                measurements[date] = bills[date]/jmas_api.get_conversion_factor()
+            Reading.save_history_to_datastore(meter_key, measurements)
+        except Exception as e:
+            raise MeterCreationError('Error in transactional create: '+e.__str__())
+        else:
+            logging.debug('[Meter] - New Meter Key = {0}'.format(meter_key))
 
     @classmethod
     def get_all_from_datastore(cls, user):
@@ -91,7 +125,7 @@ class Meter(ndb.Model):
             else:
                 raise GetMeterError('Meter does not exist')
         except Exception as e:
-                raise GetMeterError('Error getting meter: '+e.__str__())
+            raise GetMeterError('Error getting meter: '+e.__str__())
         else:
             logging.debug("[Meter] - Key = {0}".format(m[0].key))
             logging.debug("[Meter] - User Key = {0}".format(m[0].user))

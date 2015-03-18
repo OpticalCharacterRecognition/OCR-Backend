@@ -86,12 +86,8 @@ class CreateMeter(messages.Message):
     """
     Message containing the information of a Meter
         account_number: (String)
-        balance: (Integer)
-        model: (String)
     """
     account_number = messages.StringField(1, required=True)
-    balance = messages.IntegerField(2, required=True)
-    model = messages.StringField(3, required=True)
 
 
 class CreateMeterResponse(messages.Message):
@@ -175,6 +171,41 @@ READING
 """
 
 
+class Reading(messages.Message):
+    """
+    Message containing the details of a Reading
+        urlsafe_key: (String) unique id
+        creation_date: (String)
+        account_number: (String)
+        measure: (Int)
+
+    """
+    urlsafe_key = messages.StringField(1)
+    creation_date = message_types.DateTimeField(2)
+    account_number = messages.StringField(3)
+    measure = messages.IntegerField(4)
+
+
+class GetReadings(messages.Message):
+    """
+    Message asking for Readings that meet certain criteria
+        account_number: (String)
+    """
+    account_number = messages.StringField(1, required=True)
+
+
+class GetReadingsResponse(messages.Message):
+    """
+    Response to a Reading search
+        ok: (Boolean) Bill search successful or failed
+        readings: (String) If search successful contains a list of readings (see class Reading on messages.py)
+        error: (String) If search failed, contains the reason, otherwise empty.
+    """
+    ok = messages.BooleanField(1)
+    readings = messages.MessageField(Reading, 2, repeated=True)
+    error = messages.StringField(3)
+
+
 class NewReading(messages.Message):
     """
     Message containing the information of a Reading
@@ -249,7 +280,7 @@ class GetBills(messages.Message):
 
 class GetBillsResponse(messages.Message):
     """
-    Response to a location search
+    Response to a Bill search
         ok: (Boolean) Bill search successful or failed
         bills: (String) If search successful contains a list of bills (see class Bill on messages.py)
         error: (String) If search failed, contains the reason, otherwise empty.

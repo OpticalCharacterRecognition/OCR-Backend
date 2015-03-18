@@ -11,7 +11,7 @@ import logging
 import messages
 from user import User, UserCreationError, GetUserError
 from meter import Meter, MeterCreationError, GetMeterError
-from reading import Reading, ReadingCreationError
+from reading import Reading, ReadingCreationError, GetReadingError
 from bill import Bill, BillCreationError, GetBillError, BillPaymentError
 from prepay import Prepay, PrepayCreationError, GetPrepayError, PrepayPaymentError
 package = 'OCR'
@@ -93,13 +93,9 @@ class OCRBackendApi(remote.Service):
         Generates a new meter in the platform, if the account number is already in use returns an error
         """
         logging.debug("[FrontEnd - new_meter()] - Account Number = {0}".format(request.account_number))
-        logging.debug("[FrontEnd - new_meter()] - Balance = {0}".format(request.balance))
-        logging.debug("[FrontEnd - new_meter()] - Model = {0}".format(request.model))
         resp = messages.CreateMeterResponse()
         try:
-            Meter.create_in_datastore(account_number=request.account_number,
-                                      balance=request.balance,
-                                      model=request.model)
+            Meter.create_in_datastore(account_number=request.account_number)
         except MeterCreationError as e:
             resp.ok = False
             resp.error = e.value
@@ -214,6 +210,33 @@ class OCRBackendApi(remote.Service):
             resp.ok = True
         return resp
 
+    @endpoints.method(messages.GetReadings,
+                      messages.GetReadingsResponse,
+                      http_method='POST',
+                      name='reading.get',
+                      path='reading/get')
+    def get_readings(self, request):
+        """
+        Gets all readings that match the criteria.
+        """
+        logging.debug("[FrontEnd - get_readings()] - Account Number = {0}".format(request.account_number))
+        resp = messages.GetReadingsResponse()
+        try:
+            readings = Reading.get_all_from_datastore(request.account_number)
+        except GetReadingError as e:
+            resp.ok = False
+            resp.error = e.value
+        else:
+            for read in readings:
+                r = messages.Reading()
+                r.urlsafe_key = read.key.urlsafe()
+                r.creation_date = read.date
+                r.account_number = read.meter.get().account_number
+                r.measure = read.measure
+                resp.readings.append(r)
+            resp.ok = True
+        return resp
+
     """
     BILL
     """
@@ -258,7 +281,7 @@ class OCRBackendApi(remote.Service):
             for b in bills:
                 r = messages.Bill()
                 r.urlsafe_key = b.key.urlsafe()
-                r.creation_date = b.created
+                r.creation_date = b.date
                 r.account_number = b.meter.get().account_number
                 r.balance = b.balance
                 r.amount = b.amount
