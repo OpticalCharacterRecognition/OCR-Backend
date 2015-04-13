@@ -6,12 +6,13 @@ __author__ = 'Cesar'
 
 import endpoints
 from google.appengine.ext import ndb
+from google.appengine.api import taskqueue
 from protorpc import remote
 import logging
 import messages
 from user import User, UserCreationError, GetUserError
 from meter import Meter, MeterCreationError, GetMeterError
-from reading import Reading, ReadingCreationError, GetReadingError
+from reading import Reading, ReadingCreationError, GetReadingError, TaskCreationError, NotificationCreationError
 from bill import Bill, BillCreationError, GetBillError, BillPaymentError
 from prepay import Prepay, PrepayCreationError, GetPrepayError, PrepayPaymentError
 package = 'OCR'
@@ -189,23 +190,62 @@ class OCRBackendApi(remote.Service):
     """
     READING
     """
-    @endpoints.method(messages.NewReading,
-                      messages.NewReadingResponse,
+    @endpoints.method(messages.NewImageForProcessing,
+                      messages.NewImageForProcessingResponse,
                       http_method='POST',
-                      name='reading.new_image',
-                      path='reading/new_image')
-    def new_reading(self, request):
+                      name='reading.new_image_for_processing',
+                      path='reading/new_image_for_processing')
+    def new_image_for_processing(self, request):
         """
-        Generates a new reading in the platform
+        Generates a new task to process the new image received in the platform
         """
-        logging.debug("[FrontEnd - new_reading()] - Account Number = {0}".format(request.account_number))
-        logging.debug("[FrontEnd - new_reading()] - Reading = {0}".format(request.image_name))
-        resp = messages.NewReadingResponse()
+        logging.debug("[FrontEnd - new_image_for_processing()] - Account Number = {0}".format(request.account_number))
+        logging.debug("[FrontEnd - new_image_for_processing()] - Image Name = {0}".format(request.image_name))
+        resp = messages.NewImageForProcessingResponse()
         try:
             Reading.set_image_processing_task(request.account_number, request.image_name)
-        except ReadingCreationError as e:
+        except TaskCreationError as e:
             resp.ok = False
             resp.error = e.value
+        else:
+            resp.ok = True
+        return resp
+
+    @endpoints.method(messages.ImageProcessingResult,
+                      messages.ImageProcessingResultResponse,
+                      http_method='POST',
+                      name='reading.set_image_processing_result',
+                      path='reading/set_image_processing_result')
+    def set_image_processing_result(self, request):
+        """
+        Set the result of an image processing task
+            request.task_name: Process-[image]
+            request.task_payload: [meter]-[image]
+        """
+        logging.debug("[FrontEnd - set_image_processing_result()] - Task Name = {0}".format(request.task_name))
+        logging.debug("[FrontEnd - set_image_processing_result()] - Task Payload = {0}".format(request.task_payload))
+        logging.debug("[FrontEnd - set_image_processing_result()] - Result = {0}".format(request.result))
+        logging.debug("[FrontEnd - set_image_processing_result()] - Error = {0}".format(request.error))
+        resp = messages.ImageProcessingResultResponse()
+        try:
+            # TODO: Implement code to send notification to user or
+            if '' == request.error:
+                meter, i = request.task_payload.split('-')
+                Reading.save_to_datastore(meter=meter, measure=request.result)
+                # OCR-Worker done with task with successful result and result saved. Delete task from queue
+                q = taskqueue.Queue('image-processing-queue')
+                q.delete_tasks_by_name(str(request.task_name))
+            else:
+                # TODO: Retry OCR-Worker creation
+                logging.error('Error on OCR-Worker result: {0}'.format(request.error))
+                resp.ok = False
+                resp.error = 'Error on OCR-Worker result: {0}'.format(request.error)
+        except (NotificationCreationError, ReadingCreationError) as e:
+            resp.ok = False
+            resp.error = e.value
+        except Exception as e:
+            resp.ok = False
+            resp.error = 'Error deleting OCR-Worker task from queue: {0}'.format(e.__str__())
         else:
             resp.ok = True
         return resp

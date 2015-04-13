@@ -206,20 +206,44 @@ class GetReadingsResponse(messages.Message):
     error = messages.StringField(3)
 
 
-class NewReading(messages.Message):
+class NewImageForProcessing(messages.Message):
     """
-    Message containing the information of a Reading
+    Message containing the information of a new image captured in the platform
         account_number: (String)
-        measure: (Integer)
+        image_name: (String)
     """
     account_number = messages.StringField(1, required=True)
     image_name = messages.StringField(2, required=True)
 
 
-class NewReadingResponse(messages.Message):
+class NewImageForProcessingResponse(messages.Message):
     """
     Response to reading creation request
-        ok: (Boolean) Reading creation successful or failed
+        ok: (Boolean) Process creation successful or failed
+        error: (String) If creation failed, contains the reason, otherwise empty.
+    """
+    ok = messages.BooleanField(1)
+    error = messages.StringField(2)
+
+
+class ImageProcessingResult(messages.Message):
+    """
+    Message containing the result of the processing of an image
+        task_name: (String) Process-[image_name]
+        task_payload: (String) [account_number]-[image_name]
+        result: (Integer) the measurement read from the image. Empty if error
+        error: (String) error. Empty if success
+    """
+    task_name = messages.StringField(1, required=True)
+    task_payload = messages.StringField(2, required=True)
+    result = messages.IntegerField(3)
+    error = messages.StringField(4)
+
+
+class ImageProcessingResultResponse(messages.Message):
+    """
+    Response to reading creation request
+        ok: (Boolean) Result received and reading created
         error: (String) If creation failed, contains the reason, otherwise empty.
     """
     ok = messages.BooleanField(1)

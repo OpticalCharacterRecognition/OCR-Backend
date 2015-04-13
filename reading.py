@@ -5,6 +5,7 @@ __author__ = 'Cesar'
 
 import logging
 from google.appengine.ext import ndb
+from google.appengine.api import taskqueue
 from meter import Meter
 from datetime import datetime
 
@@ -39,7 +40,7 @@ class Reading(ndb.Model):
                     resp.append(r)
             else:
                 raise GetReadingError('No Readings found under specified criteria: Account Number: {0}'
-                                      .format(account_number, status))
+                                      .format(account_number))
         except Exception as e:
             raise GetReadingError('Error getting Reading: '+e.__str__())
         else:
@@ -106,23 +107,51 @@ class Reading(ndb.Model):
     @classmethod
     def set_image_processing_task(cls, meter, image_name):
         """
-        Saves a Reading as a new entity on the datastore.
+        Creates a new pull task to await processing by a OCR-Worker. The task properties are as follows:
+            name: Process-[image_name]
+            payload: [account_number]-[image_name]
         Args:
             account_number: (String) account_number from request
             image_name: (String) name of the image in CloudStorage
         Returns:
-            True if creation successful, exception otherwise
+            True if task creation successful, exception otherwise
 
         """
-        logging.debug('[Reading] - Set Image Processing Task: Image Name = {0}'.format(image_name))
-        # TODO : Implement the new task in the pull queue
-        return True
+        try:
+            q = taskqueue.Queue('image-processing-queue')
+            tasks = [taskqueue.Task(name='Process-{0}'.format(image_name),
+                                    payload='{0}-{1}'.format(meter, image_name),
+                                    method='PULL')]
+            q.add(tasks)
+        except Exception as e:
+            raise TaskCreationError('Error creating OCR-Worker task:'+e.__str__())
+        else:
+            logging.debug('[Reading] - OCR-Worker task successfully created')
+            return True
 
 
 class ReadingCreationError(Exception):
     def __init__(self, value):
         self.value = value
-        logging.exception('[Reading] - '+value, exc_info=True)
+        logging.exception('[Reading] - Reading Error:'+value, exc_info=True)
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class NotificationCreationError(Exception):
+    def __init__(self, value):
+        self.value = value
+        logging.exception('[Reading] - Notification Error:'+value, exc_info=True)
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class TaskCreationError(Exception):
+    def __init__(self, value):
+        self.value = value
+        logging.exception('[Reading] - Task Error:'+value, exc_info=True)
 
     def __str__(self):
         return repr(self.value)
