@@ -229,8 +229,8 @@ class NewImageForProcessingResponse(messages.Message):
 class ImageProcessingResult(messages.Message):
     """
     Message containing the result of the processing of an image
-        task_name: (String) Process-[image_name]
-        task_payload: (String) [account_number]-[image_name]
+        task_name: (String) Process--[image_name]
+        task_payload: (String) [account_number]--[image_name]
         result: (Integer) the measurement read from the image. Empty if error
         error: (String) error. Empty if success
     """

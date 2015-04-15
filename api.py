@@ -219,8 +219,8 @@ class OCRBackendApi(remote.Service):
     def set_image_processing_result(self, request):
         """
         Set the result of an image processing task
-            request.task_name: Process-[image]
-            request.task_payload: [meter]-[image]
+            request.task_name: Process--[image]
+            request.task_payload: [meter]--[image]
         """
         logging.debug("[FrontEnd - set_image_processing_result()] - Task Name = {0}".format(request.task_name))
         logging.debug("[FrontEnd - set_image_processing_result()] - Task Payload = {0}".format(request.task_payload))
@@ -230,7 +230,7 @@ class OCRBackendApi(remote.Service):
         try:
             # TODO: Implement code to send notification to user or
             if '' == request.error:
-                meter, i = request.task_payload.split('-')
+                meter, i = request.task_payload.split('--')
                 Reading.save_to_datastore(meter=meter, measure=request.result)
                 # OCR-Worker done with task with successful result and result saved. Delete task from queue
                 q = taskqueue.Queue('image-processing-queue')

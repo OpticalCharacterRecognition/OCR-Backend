@@ -108,8 +108,8 @@ class Reading(ndb.Model):
     def set_image_processing_task(cls, meter, image_name):
         """
         Creates a new pull task to await processing by a OCR-Worker. The task properties are as follows:
-            name: Process-[image_name]
-            payload: [account_number]-[image_name]
+            name: Process--[image_name]
+            payload: [account_number]--[image_name]
         Args:
             account_number: (String) account_number from request
             image_name: (String) name of the image in CloudStorage
@@ -119,8 +119,8 @@ class Reading(ndb.Model):
         """
         try:
             q = taskqueue.Queue('image-processing-queue')
-            tasks = [taskqueue.Task(name='Process-{0}'.format(image_name),
-                                    payload='{0}-{1}'.format(meter, image_name),
+            tasks = [taskqueue.Task(name='Process--{0}'.format(image_name),
+                                    payload='{0}--{1}'.format(meter, image_name),
                                     method='PULL')]
             q.add(tasks)
         except Exception as e:

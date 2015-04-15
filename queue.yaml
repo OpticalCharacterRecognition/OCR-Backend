@@ -2,4 +2,7 @@ queue:
 - name: image-processing-queue
   mode: pull
   acl:
-  - user_email: bar@foo.com      # can list, get, lease, delete, and update tasks
+  - user_email: 382197999605-compute@developer.gserviceaccount.com
+  - writer_email: 382197999605-compute@developer.gserviceaccount.com
+  - user_email: cesar@golocky.com
+  - writer_email: cesar@golocky.com
