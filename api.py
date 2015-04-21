@@ -18,7 +18,7 @@ from prepay import Prepay, PrepayCreationError, GetPrepayError, PrepayPaymentErr
 package = 'OCR'
 
 
-@endpoints.api(name='backend', version='v1')
+@endpoints.api(name='backend', version='v1', hostname='ocr-backend.appspot.com')
 class OCRBackendApi(remote.Service):
     """
     OCR Backend Services
