@@ -13,6 +13,7 @@ class User(ndb.Model):
     Represents a user of the platform.
 
         - account_type: Authentication used to validate the User.
+        - installation_id: Parse parameter for Push notifications.
     """
 
     created = ndb.DateTimeProperty(auto_now_add=True)
@@ -20,6 +21,7 @@ class User(ndb.Model):
     name = ndb.StringProperty()
     age = ndb.IntegerProperty()
     account_type = ndb.StringProperty(choices=['Facebook', 'G+'])
+    installation_id = ndb.StringProperty()
 
     @classmethod
     def exists(cls, email):
@@ -35,7 +37,7 @@ class User(ndb.Model):
         return cls.query(cls.email == email).count(1) == 1
 
     @classmethod
-    def create_in_datastore(cls, account_type, age, email, name):
+    def create_in_datastore(cls, account_type, age, email, name, installation_id):
         """
         Creates a new user in datastore
         """
@@ -43,7 +45,7 @@ class User(ndb.Model):
             if User.exists(email):
                 raise UserCreationError('User email already in platform')
             else:
-                u = User(account_type=account_type, age=age, email=email, name=name)
+                u = User(account_type=account_type, age=age, email=email, name=name, installation_id=installation_id)
                 key = u.put()
         except Exception as e:
             raise UserCreationError('Error creating the user in platform: '+e.__str__())
@@ -70,7 +72,27 @@ class User(ndb.Model):
             logging.debug("[User] - name = {0}".format(u[0].name))
             logging.debug("[User] - age = {0}".format(u[0].age))
             logging.debug("[User] - account_type = {0}".format(u[0].account_type))
+            logging.debug("[User] - installation_id = {0}".format(u[0].installation_id))
             return u[0]
+
+    @classmethod
+    def get_by_meter_key(cls, meter_key):
+        """
+        Gets user from datastore based on a meter_key
+        """
+        try:
+            m = meter_key.get()
+            u = m.user.get()
+        except Exception as e:
+            raise GetUserError('Error getting user: '+e.__str__())
+        else:
+            logging.debug("[User] - Key = {0}".format(u.key))
+            logging.debug("[User] - email = {0}".format(u.email))
+            logging.debug("[User] - name = {0}".format(u.name))
+            logging.debug("[User] - age = {0}".format(u.age))
+            logging.debug("[User] - account_type = {0}".format(u.account_type))
+            logging.debug("[User] - installation_id = {0}".format(u.installation_id))
+            return u
 
 
 class UserCreationError(Exception):

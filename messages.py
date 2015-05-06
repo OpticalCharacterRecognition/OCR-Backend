@@ -18,11 +18,13 @@ class CreateUser(messages.Message):
         name: (String)
         age: (Integer)
         account_type: (String)
+        installation_id: (String) Parse ID for Push notifications
     """
     email = messages.StringField(1, required=True)
     name = messages.StringField(2, required=True)
     age = messages.IntegerField(3)
     account_type = messages.StringField(4, required=True)
+    installation_id = messages.StringField(5, required=True)
 
 
 class CreateUserResponse(messages.Message):
@@ -53,6 +55,7 @@ class GetUserResponse(messages.Message):
         name = (String)
         age = (Integer)
         account_type = (String)
+        installation_id = (String) Parse ID for Push notifications
     """
     ok = messages.BooleanField(1)
     error = messages.StringField(2)
@@ -61,6 +64,7 @@ class GetUserResponse(messages.Message):
     name = messages.StringField(4)
     age = messages.IntegerField(5)
     account_type = messages.StringField(6)
+    installation_id = messages.StringField(7)
 
 
 """

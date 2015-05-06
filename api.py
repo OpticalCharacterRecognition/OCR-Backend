@@ -15,6 +15,7 @@ from meter import Meter, MeterCreationError, GetMeterError
 from reading import Reading, ReadingCreationError, GetReadingError, TaskCreationError, NotificationCreationError
 from bill import Bill, BillCreationError, GetBillError, BillPaymentError
 from prepay import Prepay, PrepayCreationError, GetPrepayError, PrepayPaymentError
+from parse_api import Push
 package = 'OCR'
 
 
@@ -40,12 +41,14 @@ class OCRBackendApi(remote.Service):
         logging.debug("[FrontEnd - new_user()] - name = {0}".format(request.name))
         logging.debug("[FrontEnd - new_user()] - age = {0}".format(request.age))
         logging.debug("[FrontEnd - new_user()] - account_type = {0}".format(request.account_type))
+        logging.debug("[FrontEnd - new_user()] - installation_id = {0}".format(request.installation_id))
         resp = messages.CreateUserResponse()
         try:
             User.create_in_datastore(email=request.email,
                                      name=request.name,
                                      age=request.age,
-                                     account_type=request.account_type)
+                                     account_type=request.account_type,
+                                     installation_id=request.installation_id)
         except UserCreationError as e:
             resp.ok = False
             resp.error = e.value
@@ -70,6 +73,7 @@ class OCRBackendApi(remote.Service):
             resp.name = retrieved_user.name
             resp.age = retrieved_user.age
             resp.account_type = retrieved_user.account_type
+            resp.installation_id = retrieved_user.installation_id
         except GetUserError as e:
             resp.ok = False
             resp.error = e.value
@@ -228,18 +232,29 @@ class OCRBackendApi(remote.Service):
         logging.debug("[FrontEnd - set_image_processing_result()] - Error = {0}".format(request.error))
         resp = messages.ImageProcessingResultResponse()
         try:
-            # TODO: Implement code to send notification to user or
             if '' == request.error:
-                meter, i = request.task_payload.split('--')
-                Reading.save_to_datastore(meter=meter, measure=request.result)
+                account_number, i = request.task_payload.split('--')
+                Reading.save_to_datastore(meter=account_number, measure=request.result)
                 # OCR-Worker done with task with successful result and result saved. Delete task from queue
                 q = taskqueue.Queue('image-processing-queue')
                 q.delete_tasks_by_name(str(request.task_name))
+                # Prepare Push notification
+                meter = Meter.get_from_datastore(account_number)
+                user = User.get_by_meter_key(meter.key)
+                logging.debug("[FrontEnd - set_image_processing_result()] - Installation_Id for notification = {0}"
+                              .format(user.installation_id))
+                # Send Push notification
+                p = Push(user.installation_id)
+                push_title = "Nueva Lectura!"
+                push_text = "Lectura Procesada. Valor: {0}".format(request.result)
+                logging.debug("[FrontEnd - set_image_processing_result()] - Text of notification = {0}"
+                              .format(push_text))
+
+                p.send(title=push_title, message=push_text)
             else:
-                # TODO: Retry OCR-Worker creation
+                # TODO: Move task to rework queue (send notification to OCR eng.) or
+                # TODO: Send notification to user that the image could not be processed
                 logging.error('Error on OCR-Worker result: {0}'.format(request.error))
-                resp.ok = False
-                resp.error = 'Error on OCR-Worker result: {0}'.format(request.error)
         except (NotificationCreationError, ReadingCreationError) as e:
             resp.ok = False
             resp.error = e.value
