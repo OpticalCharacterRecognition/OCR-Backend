@@ -382,13 +382,32 @@ class NewPrepayResponse(messages.Message):
     error = messages.StringField(3)
 
 
+class GetPrepayFactor(messages.Message):
+    """
+    Message asking for Prepay events for an account
+        m3_to_prepay: (String) Amount of m3 to prepay, this allows for different factors depending on the amount to prepay.
+    """
+    m3_to_prepay = messages.IntegerField(1, required=True)
+
+
+class GetPrepayFactorResponse(messages.Message):
+    """
+    Response to a location search
+        ok: (Boolean)
+        factor: (Float) factor corresponding to the amount of m3 to prepay
+        error: (String) If failed, contains the reason, otherwise empty.
+    """
+    ok = messages.BooleanField(1)
+    factor = messages.FloatField(2)
+    error = messages.StringField(3)
+
+
 class GetPrepays(messages.Message):
     """
     Message asking for Prepay events for an account
         account_number: (String)
     """
     account_number = messages.StringField(1, required=True)
-    status = messages.StringField(2, required=True)
 
 
 class GetPrepaysResponse(messages.Message):
@@ -402,20 +421,3 @@ class GetPrepaysResponse(messages.Message):
     prepays = messages.MessageField(Prepay, 2, repeated=True)
     error = messages.StringField(3)
 
-
-class PayPrepay(messages.Message):
-    """
-    Message requesting to mark a Prepay event as payed
-        prepay_key: (String)
-    """
-    prepay_key = messages.StringField(1, required=True)
-
-
-class PayPrepayResponse(messages.Message):
-    """
-    Response to Prepay payment request
-        ok: (Boolean) Reading creation successful or failed
-        error: (String) If creation failed, contains the reason, otherwise empty.
-    """
-    ok = messages.BooleanField(1)
-    error = messages.StringField(2)

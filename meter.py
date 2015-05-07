@@ -81,7 +81,7 @@ class Meter(ndb.Model):
             # TODO: TEMP -> historic readings are based on historic bills
             measurements = dict()
             for date in bills.keys():
-                measurements[date] = bills[date]/jmas_api.get_conversion_factor()
+                measurements[date] = bills[date]/jmas_api.get_postpay_conversion_factor()
             Reading.save_history_to_datastore(meter_key, measurements)
         except Exception as e:
             raise MeterCreationError('Error in transactional create: '+e.__str__())

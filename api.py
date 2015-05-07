@@ -15,6 +15,7 @@ from meter import Meter, MeterCreationError, GetMeterError
 from reading import Reading, ReadingCreationError, GetReadingError, TaskCreationError, NotificationCreationError
 from bill import Bill, BillCreationError, GetBillError, BillPaymentError
 from prepay import Prepay, PrepayCreationError, GetPrepayError, PrepayPaymentError
+import jmas_api
 from parse_api import Push
 package = 'OCR'
 
@@ -395,6 +396,27 @@ class OCRBackendApi(remote.Service):
             resp.ok = True
         return resp
 
+    @endpoints.method(messages.GetPrepayFactor,
+                      messages.GetPrepayFactorResponse,
+                      http_method='POST',
+                      name='prepay.factor',
+                      path='prepay/factor')
+    def get_prepay_factor(self, request):
+        """
+        Gets the factor of a prepay taking into account the amount of m3 to prepay
+        """
+        logging.debug("[FrontEnd - get_prepay_factor()] - m3_to_prepay = {0}".format(request.m3_to_prepay))
+        resp = messages.GetPrepayFactorResponse()
+        try:
+            resp.factor = jmas_api.get_prepay_conversion_factor()
+            logging.debug("[FrontEnd - get_prepay_factor()] - factor = {0}".format(resp.factor))
+        except Exception as e:
+            resp.ok = False
+            resp.error = e.__str__()
+        else:
+            resp.ok = True
+        return resp
+
     @endpoints.method(messages.GetPrepays,
                       messages.GetPrepaysResponse,
                       http_method='POST',
@@ -405,10 +427,9 @@ class OCRBackendApi(remote.Service):
         Gets all prepays events
         """
         logging.debug("[FrontEnd - get_prepays()] - Account Number = {0}".format(request.account_number))
-        logging.debug("[FrontEnd - get_prepays()] - Status = {0}".format(request.status))
         resp = messages.GetPrepaysResponse()
         try:
-            prepays = Prepay.get_all_from_datastore(request.account_number, request.status)
+            prepays = Prepay.get_all_from_datastore(request.account_number)
         except GetPrepayError as e:
             resp.ok = False
             resp.error = e.value
@@ -422,33 +443,6 @@ class OCRBackendApi(remote.Service):
                 r.prepay = p.prepay
                 r.amount = p.amount
                 resp.prepays.append(r)
-            resp.ok = True
-        return resp
-
-    @endpoints.method(messages.PayPrepay,
-                      messages.PayPrepayResponse,
-                      http_method='POST',
-                      name='prepay.pay',
-                      path='prepay/pay')
-    def pay_prepay(self, request):
-        """
-        Marks a prepay event as payed in the platform
-        """
-        logging.debug("[FrontEnd - pay_prepay()] - Prepay Key = {0}".format(request.prepay_key))
-        resp = messages.PayPrepayResponse()
-        try:
-            prepay_key = ndb.Key(urlsafe=request.prepay_key)
-            Prepay.pay(prepay_key)
-        except GetPrepayError as e:
-            resp.ok = False
-            resp.error = e.value
-        except GetMeterError as e:
-            resp.ok = False
-            resp.error = e.value
-        except PrepayPaymentError as e:
-            resp.ok = False
-            resp.error = e.value
-        else:
             resp.ok = True
         return resp
 

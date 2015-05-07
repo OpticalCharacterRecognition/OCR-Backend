@@ -71,7 +71,7 @@ class Bill(ndb.Model):
         try:
             m = Meter.get_from_datastore(meter)
             if m.balance > 0:
-                factor = jmas_api.get_conversion_factor()
+                factor = jmas_api.get_postpay_conversion_factor()
                 calculated_amount = m.balance*factor
                 b = Bill(date=datetime.now(),
                          meter=m.key,
@@ -112,7 +112,7 @@ class Bill(ndb.Model):
             for bill in bills:
                 b = Bill(date=bill,
                          meter=meter_key,
-                         balance=bills[bill]/jmas_api.get_conversion_factor(),
+                         balance=bills[bill]/jmas_api.get_postpay_conversion_factor(),
                          amount=bills[bill],
                          status='Paid')
                 key = b.put()

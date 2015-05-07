@@ -8,12 +8,20 @@ import calendar
 import random
 
 
-def get_conversion_factor():
+def get_postpay_conversion_factor():
     """
     Returns a fake and temp conversion factor
-        :return: conversion factor as int
+        :return: conversion factor as float
     """
-    return 10
+    return 10.0
+
+
+def get_prepay_conversion_factor():
+    """
+    Returns a fake and temp conversion factor
+        :return: conversion factor as float
+    """
+    return 5.0
 
 
 def generate_history(months, mid_value, variance):
