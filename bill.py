@@ -112,7 +112,7 @@ class Bill(ndb.Model):
             for bill in bills:
                 b = Bill(date=bill,
                          meter=meter_key,
-                         balance=bills[bill]/jmas_api.get_postpay_conversion_factor(),
+                         balance=int(bills[bill]/jmas_api.get_postpay_conversion_factor()),
                          amount=bills[bill],
                          status='Paid')
                 key = b.put()
