@@ -15,7 +15,7 @@ class Meter(ndb.Model):
 
         - user: The user that has this meter assigned.
         - account_number: Key that ties to JMAS system.
-        - balance: Authentication used to validate the User.
+        - balance: + - m3. Positive balance means debt, negative balance means prepay.
         - model: Model of the physical meter, for OCR purposes.
     """
     # TODO: add geolocation property

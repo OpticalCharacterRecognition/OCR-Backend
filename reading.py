@@ -23,6 +23,28 @@ class Reading(ndb.Model):
     measure = ndb.IntegerProperty()
 
     @classmethod
+    def get_last_from_datastore(cls, account_number):
+        """
+        Gets the last reading from datastore based on:
+        Args:
+            account_number: (String)
+        Returns:
+            A reading
+        """
+        try:
+            meter = Meter.get_from_datastore(account_number)
+            query_response = Reading.query(Reading.meter == meter.key).order(-cls.date).fetch(limit=1)
+            if query_response:
+                resp = query_response[0]
+            else:
+                raise GetReadingError('No previous Readings found under specified criteria: Account Number: {0}'
+                                      .format(account_number))
+        except Exception as e:
+            raise GetReadingError('Error getting Reading: '+e.__str__())
+        else:
+            return resp
+
+    @classmethod
     def get_all_from_datastore(cls, account_number):
         """
         Gets all readings from datastore based on:
@@ -56,27 +78,34 @@ class Reading(ndb.Model):
             account_number: (String) account_number from request
 
         Returns:
-            True if creation successful, exception otherwise
-
+            True if creation successful, False if negative consumption, exception otherwise
         """
         try:
             m = Meter.get_from_datastore(meter)
             r = Reading(date=datetime.now(),
                         meter=m.key,
                         measure=measure)
+            # Get consumption. This reading - Last Reading
+            last_reading = cls.get_last_from_datastore(m.account_number)
+            logging.debug('[Reading] - Last Reading, Measure = {0}'.format(last_reading.measure))
+            consumption = measure - last_reading.measure
+            logging.debug('[Reading] - Consumption = {0}'.format(consumption))
+            if consumption < 0:
+                return False
+            else:
+                # Update balance with the calculated consumption in datastore
+                current_balance = Meter.get_balance(meter)
+                new_balance = current_balance + consumption
+                # FIXME handle exception from Meter class
+                Meter.set_balance(meter, new_balance)
+                logging.debug('[Reading] - New Balance: {0} = (Old Balance = {1}) + (Consumption = {2})'
+                              .format(new_balance, current_balance, consumption))
             key = r.put()
         except Exception as e:
             logging.exception("[Reading] - "+e.message)
             raise ReadingCreationError('Error creating the reading in datastore: '+e.__str__())
         else:
             logging.debug('[Reading] - New Reading, Measure = {0} Key = {1}'.format(measure, key))
-            # Update balance in datastore
-            current_balance = Meter.get_balance(meter)
-            new_balance = current_balance + measure
-            # FIXME handle exception from Meter class
-            Meter.set_balance(meter, new_balance)
-            logging.debug('[Reading] - New Balance: {0} = (Old Balance = {1}) + (Reading = {2})'
-                          .format(new_balance, current_balance, measure))
             return True
 
     @classmethod

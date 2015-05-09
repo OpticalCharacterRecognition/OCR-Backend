@@ -83,8 +83,17 @@ class Prepay(ndb.Model):
             logging.exception("[Prepay] - "+e.message)
             raise PrepayCreationError('Error creating the prepay event in datastore: '+e.__str__())
         else:
+            # Update balance in datastore
+            current_balance = Meter.get_balance(m.account_number)
+            new_balance = current_balance - p.prepay
+            # FIXME handle exception from Meter class
+            Meter.set_balance(m.account_number, new_balance)
+
             logging.debug('[Prepay] - Prepay with Key = {0} - Amount: ${1} = (m3 to Prepay = {2})*(Factor = {3})'
                           .format(key, calculated_amount, m3_to_prepay, factor))
+            logging.debug('[Prepay] - New Balance: {0} = (Old Balance = {1}) - (Prepay = {2})'
+                          .format(new_balance, current_balance, p.prepay))
+
             return True
 
 

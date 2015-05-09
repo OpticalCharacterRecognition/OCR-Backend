@@ -1,0 +1,7 @@
+indexes:
+
+- kind: Reading
+  properties:
+  - name: meter
+  - name: date
+    direction: desc
