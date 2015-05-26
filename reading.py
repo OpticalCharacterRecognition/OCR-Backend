@@ -134,9 +134,10 @@ class Reading(ndb.Model):
             return True
 
     @classmethod
-    def set_image_processing_task(cls, meter, image_name):
+    def set_image_processing_task(cls, queue, meter, image_name):
         """
         Creates a new pull task to await processing by a OCR-Worker. The task properties are as follows:
+            task_queue: [image-processing-queue] | [negative-consumption-queue] | [need-help-queue]
             name: Process--[image_name]
             payload: [account_number]--[image_name]
         Args:
@@ -147,7 +148,7 @@ class Reading(ndb.Model):
 
         """
         try:
-            q = taskqueue.Queue('image-processing-queue')
+            q = taskqueue.Queue(queue)
             tasks = [taskqueue.Task(name='Process--{0}'.format(image_name),
                                     payload='{0}--{1}'.format(meter, image_name),
                                     method='PULL')]
@@ -155,7 +156,7 @@ class Reading(ndb.Model):
         except Exception as e:
             raise TaskCreationError('Error creating OCR-Worker task:'+e.__str__())
         else:
-            logging.debug('[Reading] - OCR-Worker task successfully created')
+            logging.debug('[Reading] - Task successfully created in: {0}'.format(queue))
             return True
 
 

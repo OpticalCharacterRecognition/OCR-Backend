@@ -24,22 +24,6 @@ def get_prepay_conversion_factor():
     return 5.0
 
 
-def generate_history(months, mid_value, variance):
-    """
-    Generates a fake and temp history for the measurements and bills
-        :param
-            months: number of months of history to generate
-            mid_value: central value to use for random numbers
-            variance: how far from mid_value
-        :return: random history as dict
-    """
-    history = dict()
-    for month in range(1, months):
-        v = random.randint(mid_value-variance, mid_value+variance)
-        history[month] = v
-    return history
-
-
 def get_balance(account_number):
     """
     Returns a fake and temp balance
@@ -59,20 +43,79 @@ def get_model(account_number):
     return models[random.randint(0, 3)]
 
 
-def get_bills(account_number):
-    """
-    Returns a dictionary of the form:
-            {datetime: $_amount}
-            ex: {datetime.datetime(2015, 2, 15, 0, 0): 346}
-    with the bills of the last 6 months.
-        :param account_number:
-        :return: last 6 bills as dict (1 bill per month)
-    """
+class FakeHistory:
+
     bills = dict()
-    today = datetime.date.today()
-    h = generate_history(6, 300, 50)
-    for i, m in enumerate(h):
-        date = today - datetime.timedelta(days=i*30)
-        date = datetime.datetime.combine(date, datetime.datetime.min.time())
-        bills[date] = h[m]
-    return bills
+    readings = []
+    starting_value = 0
+    months = 0
+
+    def __init__(self, account_number, months, value_to_approximate):
+        self.months = months
+        history = self._generate_reading_history(value_to_approximate, 10)
+        self.readings = self._get_readings(account_number, history)
+        self.bills = self._get_bills(account_number, history)
+
+    def _generate_reading_history(self, value_to_approximate, variance):
+        """
+        Generates a fake and temp history of meter readings (m3).
+            :param
+                months: number of months of history to generate
+                value_to_approximate: meter value to approximate (useful for demo meters)
+                variance: how far from 30m3 per month
+            :return: random history as dict
+        """
+        history = []
+        self.starting_value = value_to_approximate - self.months*(30+variance)
+        previous_month = 0
+        for month in xrange(0, self.months):
+            if month == 0:
+                v = self.starting_value
+            else:
+                v = previous_month + random.randint(30-variance, 30+variance)
+            history.append(v)
+            previous_month = v
+        return history
+
+    def _get_readings(self, account_number, readings):
+        """
+        Returns a dictionary of the form:
+                {datetime: m3_reading}
+                ex: {datetime.datetime(2015, 2, 15, 0, 0): 9000}
+        with the readings of the last 6 months.
+            :param account_number:
+            :return: last 6 readings as dict (1 reading per month)
+        """
+        measurements = dict()
+        today = datetime.date.today()
+        h = readings
+        for i, m in enumerate(h):
+            date = today - datetime.timedelta(days=30*(self.months-i))
+            date = datetime.datetime.combine(date, datetime.datetime.min.time())
+            if i == 0:
+                measurements[date] = self.starting_value
+            else:
+                measurements[date] = h[i]
+        return measurements
+
+    def _get_bills(self, account_number, readings):
+        """
+        Returns a dictionary of the form:
+                {datetime: $_amount}
+                ex: {datetime.datetime(2015, 2, 15, 0, 0): 346}
+        with the bills of the last 6 months.
+            :param account_number:
+            :return: last 6 bills as dict (1 bill per month)
+        """
+        bills = dict()
+        today = datetime.date.today()
+        h = readings
+        for i, m in enumerate(h):
+            date = today - datetime.timedelta(days=30*(self.months-i))
+            date = datetime.datetime.combine(date, datetime.datetime.min.time())
+            if i == 0:
+                bills[date] = 30*get_postpay_conversion_factor()
+            else:
+                bills[date] = (h[i] - h[i-1])*get_postpay_conversion_factor()
+        return bills
+

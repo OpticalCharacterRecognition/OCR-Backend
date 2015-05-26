@@ -73,15 +73,13 @@ class Meter(ndb.Model):
             # Create Meter
             m = Meter(account_number=account_number, balance=balance, model=model)
             meter_key = m.put()
+            # Generate fake History TODO: TEMP!!
+            history = jmas_api.FakeHistory(meter_key, 6, 9321)
             # Get and save historic bills
-            bills = jmas_api.get_bills(account_number)
-            # from bill import Bill
+            bills = history.bills
             Bill.save_history_to_datastore(meter_key, bills)
             # Get and save historic readings
-            # TODO: TEMP -> historic readings are based on historic bills
-            measurements = dict()
-            for date in bills.keys():
-                measurements[date] = int(bills[date]/jmas_api.get_postpay_conversion_factor())
+            measurements = history.readings
             Reading.save_history_to_datastore(meter_key, measurements)
         except Exception as e:
             raise MeterCreationError('Error in transactional create: '+e.__str__())

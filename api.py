@@ -209,7 +209,9 @@ class OCRBackendApi(remote.Service):
         logging.debug("[FrontEnd - new_image_for_processing()] - Image Name = {0}".format(request.image_name))
         resp = messages.NewImageForProcessingResponse()
         try:
-            Reading.set_image_processing_task(request.account_number, request.image_name)
+            Reading.set_image_processing_task(queue='image-processing-queue',
+                                              meter=request.account_number,
+                                              image_name=request.image_name)
         except TaskCreationError as e:
             resp.ok = False
             resp.error = e.value
@@ -227,70 +229,142 @@ class OCRBackendApi(remote.Service):
         Set the result of an image processing task
             request.task_name: Process--[image]
             request.task_payload: [meter]--[image]
+            request.human: True, False
         """
         logging.debug("[FrontEnd - set_image_processing_result()] - Task Name = {0}".format(request.task_name))
         logging.debug("[FrontEnd - set_image_processing_result()] - Task Payload = {0}".format(request.task_payload))
         logging.debug("[FrontEnd - set_image_processing_result()] - Result = {0}".format(request.result))
         logging.debug("[FrontEnd - set_image_processing_result()] - Error = {0}".format(request.error))
-        account_number, i = request.task_payload.split('--')
+        logging.debug("[FrontEnd - set_image_processing_result()] - Human = {0}".format(request.human))
+        account_number, image = request.task_payload.split('--')
         resp = messages.ImageProcessingResultResponse()
         try:
-            if '' == request.error:
-                if Reading.save_to_datastore(meter=account_number, measure=request.result):
-                    # OCR-Worker done with task with successful result and result saved. Delete task from queue
-                    q = taskqueue.Queue('image-processing-queue')
-                    q.delete_tasks_by_name(str(request.task_name))
-                    # Prepare Push notification
-                    meter = Meter.get_from_datastore(account_number)
-                    user = User.get_by_meter_key(meter.key)
-                    logging.debug("[FrontEnd - set_image_processing_result()] - Installation_Id for notification = {0}"
-                                  .format(user.installation_id))
-                    # Send Push notification
-                    p = Push(user.installation_id)
-                    push_title = "Nueva Lectura!"
-                    push_text = "Lectura Procesada. Valor: {0}".format(request.result)
-                    logging.debug("[FrontEnd - set_image_processing_result()] - Text of notification = {0}"
-                                  .format(push_text))
+            if request.human:
+                # OCR performed by human hand (http://human-helper.ddns.net)
+                if '' == request.error:
+                    if Reading.save_to_datastore(meter=account_number, measure=request.result):
+                        # Prepare Push notification
+                        meter = Meter.get_from_datastore(account_number)
+                        user = User.get_by_meter_key(meter.key)
+                        logging.debug("[FrontEnd - set_image_processing_result()] - "
+                                      "Installation_Id for notification = {0}"
+                                      .format(user.installation_id))
+                        # Send Push notification
+                        p = Push(user.installation_id)
+                        push_title = "Nueva Lectura!"
+                        push_text = "Lectura Procesada. Valor: {0}".format(request.result)
+                        logging.debug("[FrontEnd - set_image_processing_result()] - Text of notification = {0}"
+                                      .format(push_text))
 
-                    p.send(title=push_title, message=push_text)
+                        p.send(title=push_title, message=push_text)
+                    else:
+                        logging.warning('[FrontEnd - set_image_processing_result()] - Consumo Negativo')
+                        # Create task to investigate negative consumption (OCR engineering)
+                        Reading.set_image_processing_task(queue='negative-consumption-queue',
+                                                          meter=account_number,
+                                                          image_name=image)
+                        # Prepare Push notification
+                        meter = Meter.get_from_datastore(account_number)
+                        user = User.get_by_meter_key(meter.key)
+                        logging.debug("[FrontEnd - set_image_processing_result()] "
+                                      "- Installation_Id for notification = {0}"
+                                      .format(user.installation_id))
+                        # Push notification for user to inform that the reading is wrong
+                        p = Push(user.installation_id)
+                        push_title = "Error en Lectura =("
+                        push_text = "Lo sentimos, algo salio mal con tu lectura .." \
+                                    " lo estamos revisando (consumo negativo)"
+                        logging.debug("[FrontEnd - set_image_processing_result()]"
+                                      " - Text of notification = {0}"
+                                      .format(push_text))
+                        p.send(title=push_title, message=push_text)
+
                 else:
-                    logging.warning('[FrontEnd - set_image_processing_result()] - Consumo Negativo')
-                    # OCR-Worker done with task with successful result but we have negative consumption.
-                    q = taskqueue.Queue('image-processing-queue')
-                    q.delete_tasks_by_name(str(request.task_name))
-                    # TODO Move task to review queue (send notification to OCR engineering department.)
+                    logging.warning('[FrontEnd - set_image_processing_result()] - Error in human OCR')
                     # Prepare Push notification
                     meter = Meter.get_from_datastore(account_number)
                     user = User.get_by_meter_key(meter.key)
-                    logging.debug("[FrontEnd - set_image_processing_result()] - Installation_Id for notification = {0}"
+                    logging.debug("[FrontEnd - set_image_processing_result()] -"
+                                  " Installation_Id for notification = {0}"
                                   .format(user.installation_id))
                     # Push notification for user to inform that the reading is wrong
                     p = Push(user.installation_id)
-                    push_title = "Error en Lectura =("
-                    push_text = "Lo sentimos, algo salio mal con tu lectura .. lo estamos revisando (consumo negativo)"
+                    push_title = "Resultado de Revision de Lectura"
+                    push_text = request.error
                     logging.debug("[FrontEnd - set_image_processing_result()]"
                                   " - Text of notification = {0}"
                                   .format(push_text))
                     p.send(title=push_title, message=push_text)
+
             else:
-                logging.warning('[FrontEnd - set_image_processing_result()] - Error en OCR')
-                # OCR-Worker done with task with invalid result.
-                q = taskqueue.Queue('image-processing-queue')
-                q.delete_tasks_by_name(str(request.task_name))
-                # TODO Move task to review queue (send notification to OCR engineering department.)
-                # Prepare Push notification
-                meter = Meter.get_from_datastore(account_number)
-                user = User.get_by_meter_key(meter.key)
-                logging.debug("[FrontEnd - set_image_processing_result()] - Installation_Id for notification = {0}"
-                              .format(user.installation_id))
-                # Push notification for user to inform that the reading is wrong
-                p = Push(user.installation_id)
-                push_title = "Error en Lectura =("
-                push_text = "Lo sentimos, algo salio mal con tu lectura .. lo estamos revisando (error en OCR)"
-                logging.debug("[FrontEnd - set_image_processing_result()]"
-                              " - Text of notification = {0}"
-                              .format(push_text))
-                p.send(title=push_title, message=push_text)
+                # OCR performed by VMX engine
+                if '' == request.error:
+                    if Reading.save_to_datastore(meter=account_number, measure=request.result):
+                        # OCR-Worker done with task with successful result and result saved. Delete task from queue
+                        q = taskqueue.Queue('image-processing-queue')
+                        q.delete_tasks_by_name(str(request.task_name))
+                        # Prepare Push notification
+                        meter = Meter.get_from_datastore(account_number)
+                        user = User.get_by_meter_key(meter.key)
+                        logging.debug("[FrontEnd - set_image_processing_result()] "
+                                      "- Installation_Id for notification = {0}"
+                                      .format(user.installation_id))
+                        # Send Push notification
+                        p = Push(user.installation_id)
+                        push_title = "Nueva Lectura!"
+                        push_text = "Lectura Procesada. Valor: {0}".format(request.result)
+                        logging.debug("[FrontEnd - set_image_processing_result()] - Text of notification = {0}"
+                                      .format(push_text))
+
+                        p.send(title=push_title, message=push_text)
+                    else:
+                        logging.warning('[FrontEnd - set_image_processing_result()] - Consumo Negativo')
+                        # OCR-Worker done with task with successful result but we have negative consumption.
+                        q = taskqueue.Queue('image-processing-queue')
+                        q.delete_tasks_by_name(str(request.task_name))
+                        # Create task to investigate negative consumption (OCR engineering)
+                        Reading.set_image_processing_task(queue='negative-consumption-queue',
+                                                          meter=account_number,
+                                                          image_name=image)
+                        # Prepare Push notification
+                        meter = Meter.get_from_datastore(account_number)
+                        user = User.get_by_meter_key(meter.key)
+                        logging.debug("[FrontEnd - set_image_processing_result()] "
+                                      "- Installation_Id for notification = {0}"
+                                      .format(user.installation_id))
+                        # Push notification for user to inform that the reading is wrong
+                        p = Push(user.installation_id)
+                        push_title = "Error en Lectura =("
+                        push_text = "Lo sentimos, algo salio mal con tu lectura .." \
+                                    " lo estamos revisando (consumo negativo)"
+                        logging.debug("[FrontEnd - set_image_processing_result()]"
+                                      " - Text of notification = {0}"
+                                      .format(push_text))
+                        p.send(title=push_title, message=push_text)
+                else:
+                    logging.warning('[FrontEnd - set_image_processing_result()] - Error en OCR')
+                    # OCR-Worker done with task with invalid result. Delete OCR image processing task
+                    q = taskqueue.Queue('image-processing-queue')
+                    q.delete_tasks_by_name(str(request.task_name))
+                    # Create task to help automatic OCR in recognizing numbers (OCR engineering)
+                    Reading.set_image_processing_task(queue='need-help-queue',
+                                                      meter=account_number,
+                                                      image_name=image)
+                    # Prepare Push notification
+                    meter = Meter.get_from_datastore(account_number)
+                    user = User.get_by_meter_key(meter.key)
+                    logging.debug("[FrontEnd - set_image_processing_result()] -"
+                                  " Installation_Id for notification = {0}"
+                                  .format(user.installation_id))
+                    # Push notification for user to inform that the reading is wrong
+                    p = Push(user.installation_id)
+                    push_title = "Error en Lectura =("
+                    push_text = "Lo sentimos, algo salio mal con tu lectura .." \
+                                " lo estamos revisando (error en OCR)"
+                    logging.debug("[FrontEnd - set_image_processing_result()]"
+                                  " - Text of notification = {0}"
+                                  .format(push_text))
+                    p.send(title=push_title, message=push_text)
 
         except (NotificationCreationError, ReadingCreationError) as e:
             resp.ok = False

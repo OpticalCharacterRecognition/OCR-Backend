@@ -6,3 +6,35 @@ queue:
   - writer_email: 382197999605-compute@developer.gserviceaccount.com
   - user_email: cesar@golocky.com
   - writer_email: cesar@golocky.com
+
+- name: need-help-queue
+  mode: pull
+  acl:
+  - user_email: 382197999605-compute@developer.gserviceaccount.com
+  - writer_email: 382197999605-compute@developer.gserviceaccount.com
+  - user_email: cesar@golocky.com
+  - writer_email: cesar@golocky.com
+
+- name: negative-consumption-queue
+  mode: pull
+  acl:
+  - user_email: 382197999605-compute@developer.gserviceaccount.com
+  - writer_email: 382197999605-compute@developer.gserviceaccount.com
+  - user_email: cesar@golocky.com
+  - writer_email: cesar@golocky.com
+
+- name: training
+  mode: pull
+  acl:
+  - user_email: 382197999605-compute@developer.gserviceaccount.com
+  - writer_email: 382197999605-compute@developer.gserviceaccount.com
+  - user_email: cesar@golocky.com
+  - writer_email: cesar@golocky.com
+
+- name: improve-cropping
+  mode: pull
+  acl:
+  - user_email: 382197999605-compute@developer.gserviceaccount.com
+  - writer_email: 382197999605-compute@developer.gserviceaccount.com
+  - user_email: cesar@golocky.com
+  - writer_email: cesar@golocky.com

@@ -237,11 +237,13 @@ class ImageProcessingResult(messages.Message):
         task_payload: (String) [account_number]--[image_name]
         result: (Integer) the measurement read from the image. Empty if error
         error: (String) error. Empty if success
+        human: (Boolean) True if done by human hand (http://human-helper.ddns.net)
     """
     task_name = messages.StringField(1, required=True)
     task_payload = messages.StringField(2, required=True)
     result = messages.IntegerField(3)
     error = messages.StringField(4)
+    human = messages.BooleanField(5)
 
 
 class ImageProcessingResultResponse(messages.Message):
