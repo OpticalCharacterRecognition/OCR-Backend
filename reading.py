@@ -81,6 +81,7 @@ class Reading(ndb.Model):
             True if creation successful, False if negative consumption, exception otherwise
         """
         try:
+            # TODO associate reading with image!!!
             m = Meter.get_from_datastore(meter)
             r = Reading(date=datetime.now(),
                         meter=m.key,
